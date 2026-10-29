@@ -59,5 +59,8 @@ means the position is only region/country level. The footer carries the attribut
 
 ## Limits
 
-- Commands page and command detail use the most recent 2000 commands.
-- Out of scope: map, MITRE lookup, geolocation.
+- Attackers, Sessions and Commands show 100 rows per page. Searching, the denied/granted filter, the date range
+  and sorting are done by the API over ALL rows (this needs backend/contracts 1.1.0 or newer). The date pickers
+  work in UTC down to the second.
+- The dashboard's top 10 countries / attackers / credentials and the map come from the API, over all IPs.
+- Out of scope: MITRE lookup.

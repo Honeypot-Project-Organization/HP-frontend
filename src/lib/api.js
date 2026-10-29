@@ -1,6 +1,6 @@
 import {
-  ApiError, asList, normalizeAttacker, normalizeCommand, normalizeCredential,
-  normalizeDaily, normalizeSession, normalizeStats,
+  ApiError, asList, normalizeAttacker, normalizeCommand, normalizeCountries, normalizeCredential,
+  normalizeDaily, normalizeGroup, normalizePoints, normalizeSession, normalizeStats,
 } from "./normalize.js";
 
 const rawBase = import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000";
@@ -29,15 +29,8 @@ export function clearToken() {
 
 const cache = new Map();
 export function clearCache() { cache.clear(); }
-async function memo(key, ttlMs, fn) {
-  const hit = cache.get(key);
-  if (hit && Date.now() - hit.t < ttlMs) return hit.v;
-  const v = await fn();
-  cache.set(key, { t: Date.now(), v });
-  return v;
-}
-
-async function request(path, { method = "GET", body, auth = true, timeoutMs = 20000 } = {}) {
+/** meta:true returns { data, total } where total is the X-Total-Count header (null if absent). */
+async function request(path, { method = "GET", body, auth = true, timeoutMs = 20000, meta = false } = {}) {
   const headers = {};
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (auth) {
@@ -71,7 +64,22 @@ async function request(path, { method = "GET", body, auth = true, timeoutMs = 20
     const msg = typeof d === "string" ? d : res.status === 429 ? "Rate limited - slow down" : `Request failed (${res.status})`;
     throw new ApiError(msg, res.status);
   }
+  if (meta) {
+    const raw = res.headers && res.headers.get ? res.headers.get("X-Total-Count") : null;
+    const n = raw === null || raw === "" ? NaN : Number(raw);
+    return { data, total: Number.isInteger(n) && n >= 0 ? n : null };
+  }
   return data;
+}
+
+/** "?a=1&b=2" from an object, skipping empty values. */
+export function qs(params) {
+  const u = new URLSearchParams();
+  for (const [k, v] of Object.entries(params || {})) {
+    if (v !== undefined && v !== null && String(v).trim() !== "") u.set(k, String(v).trim());
+  }
+  const s = u.toString();
+  return s ? `?${s}` : "";
 }
 
 export const PAGE_SIZE = 500;
@@ -105,18 +113,27 @@ export async function getHealth() {
 export const getStats = () => request("/api/stats").then(normalizeStats);
 export const getDailySeries = (days = 30) =>
   request(`/api/stats/daily?days=${encodeURIComponent(days)}`).then(normalizeDaily);
-export const getTopCredentials = (limit = 8) =>
+export const getTopCredentials = (limit = 10) =>
   request(`/api/stats/top-credentials?limit=${limit}`).then((r) => asList(r).map(normalizeCredential));
+export const getTopCountries = (limit = 10) =>
+  request(`/api/stats/top-countries?limit=${limit}`).then(normalizeCountries);
+export const getGeoPoints = () => request("/api/geo/points").then(normalizePoints);
 
-export const getSessionsPage = (skip = 0, limit = 100) =>
-  request(`/api/sessions?limit=${limit}&skip=${skip}`).then((r) => asList(r).map(normalizeSession));
+/**
+ * One page of sessions, filtered/sorted by the server over ALL sessions.
+ * params: { limit, skip, q, login, date_from, date_to, sort, order } -> { rows, total }
+ */
+export const getSessionsList = (params) =>
+  request(`/api/sessions${qs(params)}`, { meta: true }).then(({ data, total }) => ({ rows: asList(data).map(normalizeSession), total }));
+export const getSessionsPage = (skip = 0, limit = 100) => getSessionsList({ skip, limit }).then((r) => r.rows);
 export const getSession = (id) =>
   request(`/api/sessions/${encodeURIComponent(id)}`).then(normalizeSession);
 export const getSessionCommands = (id) =>
   request(`/api/sessions/${encodeURIComponent(id)}/commands`).then((r) => asList(r).map(normalizeCommand));
 
-export const getAttackers = () =>
-  memo("attackers", 15000, () => fetchPages("/api/ips", { page: 200, maxPages: 5 }).then((r) => r.map(normalizeAttacker)));
+/** One page of IPs, filtered/sorted by the server over ALL IPs -> { rows, total } */
+export const getAttackersList = (params) =>
+  request(`/api/ips${qs(params)}`, { meta: true }).then(({ data, total }) => ({ rows: asList(data).map(normalizeAttacker), total }));
 export const getAttacker = (ip) =>
   request(`/api/ips/${encodeURIComponent(ip)}`).then(normalizeAttacker);
 export const getIpSessions = (ip) =>
@@ -133,5 +150,11 @@ export const getGeoStatus = () =>
       return { available: null };
     });
 
-export const getCommandCorpus = () =>
-  memo("corpus", 15000, () => fetchPages("/api/commands", { maxPages: 4 }).then((r) => r.map(normalizeCommand)));
+/** Distinct commands (grouped by the server over ALL commands) -> { rows, total } */
+export const getCommandGroups = (params) =>
+  request(`/api/commands/groups${qs(params)}`, { meta: true }).then(({ data, total }) => ({ rows: asList(data).map(normalizeGroup), total }));
+export const getCommandGroup = (key) =>
+  request(`/api/commands/groups/${encodeURIComponent(key)}`).then(normalizeGroup);
+export const getCommandOccurrences = (key, params) =>
+  request(`/api/commands/groups/${encodeURIComponent(key)}/occurrences${qs(params)}`, { meta: true })
+    .then(({ data, total }) => ({ rows: asList(data).map(normalizeCommand), total }));

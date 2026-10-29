@@ -9,9 +9,11 @@ import RefreshButton from "../components/RefreshButton.jsx";
 import StatBlock from "../components/StatBlock.jsx";
 import { Empty, ErrorBox, Loading } from "../components/States.jsx";
 import { useAsync } from "../hooks/useAsync.js";
-import { getAttackers, getDailySeries, getGeoStatus, getSessionsPage, getStats, getTopCredentials, clearCache } from "../lib/api.js";
-import { fmtDuration, fmtRelative, fmtDateTime, toDate } from "../lib/format.js";
-import { countryCounts } from "../lib/geo.js";
+import {
+  getAttackersList, getDailySeries, getGeoPoints, getGeoStatus, getSessionsPage, getStats, getTopCountries,
+  getTopCredentials, clearCache,
+} from "../lib/api.js";
+import { fmtRelative, fmtDateTime, fmtSessionDuration, toDate } from "../lib/format.js";
 import { fillDays } from "../lib/series.js";
 
 const RANGES = [7, 14, 30, 90];
@@ -19,10 +21,13 @@ const RANGES = [7, 14, 30, 90];
 export default function DashboardPage() {
   const [days, setDays] = useState(30);
   const { data, error, loading, updatedAt, reload } = useAsync(async () => {
-    const [stats, daily, sessions, attackers, creds, geoStatus] = await Promise.all([
-      getStats(), getDailySeries(days), getSessionsPage(0, 10), getAttackers(), getTopCredentials(8), getGeoStatus(),
+    // Top lists are computed by the server over ALL rows, not over a loaded subset.
+    const [stats, daily, sessions, top, creds, geoStatus, countries, points] = await Promise.all([
+      getStats(), getDailySeries(days), getSessionsPage(0, 10),
+      getAttackersList({ limit: 10, sort: "total_sessions", order: "desc" }).then((r) => r.rows),
+      getTopCredentials(10), getGeoStatus(), getTopCountries(10), getGeoPoints(),
     ]);
-    return { stats, daily: fillDays(daily, days), sessions, attackers, creds, geoStatus };
+    return { stats, daily: fillDays(daily, days), sessions, top, creds, geoStatus, countries, points };
   }, [days], 60000);
 
   const refresh = () => { clearCache(); reload(); };
@@ -34,9 +39,8 @@ export default function DashboardPage() {
   if (!data && loading) return <div>{header}<Loading label="Fetching telemetry" /></div>;
   if (!data) return <div>{header}<ErrorBox error={error} onRetry={refresh} /></div>;
 
-  const { stats, daily, sessions, attackers, creds, geoStatus } = data;
-  const countries = countryCounts(attackers, 8);
-  const top = [...attackers].sort((a, b) => b.total_sessions - a.total_sessions).slice(0, 8);
+  const { stats, daily, sessions, top, creds, geoStatus, points } = data;
+  const countries = data.countries.countries;
   const last = toDate(stats.last_event_received_at);
   const stale = last ? Date.now() - last.getTime() > 3600_000 : false;
 
@@ -65,10 +69,11 @@ export default function DashboardPage() {
 
       <Panel title="Attack origins" className="mt-5" threat>
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_16rem]">
-          <MapPanel attackers={attackers} available={geoStatus.available} />
+          <MapPanel points={points} available={geoStatus.available} />
           <div>
             <h3 className="mb-2 font-mono text-xs uppercase tracking-wider text-mute">Top countries</h3>
             {countries.length === 0 ? <p className="font-mono text-xs text-mute">No country data yet</p> : (
+              <>
               <table className="tbl">
                 <thead><tr><th>Country</th><th>IPs</th><th>Sess</th></tr></thead>
                 <tbody>
@@ -81,6 +86,11 @@ export default function DashboardPage() {
                   ))}
                 </tbody>
               </table>
+              <p className="mt-2 font-mono text-xs text-mute">
+                Across all {data.countries.total.toLocaleString("en-US")} IPs ({data.countries.located.toLocaleString("en-US")} located
+                {data.countries.pending > 0 ? `, ${data.countries.pending.toLocaleString("en-US")} still being located` : ""}).
+              </p>
+              </>
             )}
           </div>
         </div>
@@ -97,7 +107,7 @@ export default function DashboardPage() {
                     <tr key={s.id}>
                       <td className="font-mono"><Link className="text-signal hover:underline" to={`/sessions/${encodeURIComponent(s.id)}`}>{s.src_ip}</Link></td>
                       <td className="font-mono text-xs">{fmtDateTime(s.start_time)}</td>
-                      <td className="font-mono">{fmtDuration(s.duration_seconds)}</td>
+                      <td className="font-mono">{fmtSessionDuration(s)}</td>
                       <td><AccessPill ok={s.login_success} /></td>
                     </tr>
                   ))}

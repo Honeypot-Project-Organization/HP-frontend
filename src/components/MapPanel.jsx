@@ -39,11 +39,12 @@ function viewBoxFor(dots, focus) {
 }
 
 /**
- * attackers: normalized attacker list (each may have .geo)
+ * points: { dots, located, total, unplaced } already grouped by the server (dashboard, all IPs)
+ * attackers: alternatively a normalized attacker list (each may have .geo), grouped here (IP page)
  * focus: zoom in on the first dot (single-IP page)
  * available: result of /api/geo/status (true / false / null = unknown)
  */
-export default function MapPanel({ attackers, focus = false, available = null }) {
+export default function MapPanel({ points = null, attackers = null, focus = false, available = null }) {
   const navigate = useNavigate();
   const [countries, setCountries] = useState(null);
   const [mapError, setMapError] = useState(false);
@@ -56,7 +57,7 @@ export default function MapPanel({ attackers, focus = false, available = null })
     return () => { live = false; };
   }, []);
 
-  const { dots, located, total, unplaced } = useMemo(() => clusterPoints(attackers), [attackers]);
+  const { dots, located, total, unplaced } = useMemo(() => points || clusterPoints(attackers), [points, attackers]);
   const maxSessions = dots.reduce((m, d) => Math.max(m, d.sessions), 1);
   const placed = useMemo(
     () => dots.map((d) => {
@@ -82,7 +83,7 @@ export default function MapPanel({ attackers, focus = false, available = null })
   }
 
   const open = (d) => {
-    if (d.ips.length === 1) navigate(`/attackers/${encodeURIComponent(d.ips[0])}`);
+    if (d.count === 1 && d.ips.length === 1) navigate(`/attackers/${encodeURIComponent(d.ips[0])}`);
     else setPinned(d);
   };
 
@@ -105,7 +106,7 @@ export default function MapPanel({ attackers, focus = false, available = null })
           {placed.map((d) => {
             const r = dotRadius(d.sessions, maxSessions) * scale * (focus ? 1.6 : 1);
             const exact = d.precision === "city";
-            const label = `${placeName(d)}: ${d.ips.length} IP${d.ips.length === 1 ? "" : "s"}, ${d.sessions} session${d.sessions === 1 ? "" : "s"}`;
+            const label = `${placeName(d)}: ${d.count} IP${d.count === 1 ? "" : "s"}, ${d.sessions} session${d.sessions === 1 ? "" : "s"}`;
             return (
               <g
                 key={d.key}
@@ -137,14 +138,14 @@ export default function MapPanel({ attackers, focus = false, available = null })
           <div role="status" className="mt-2 border border-line bg-raised px-3 py-2 font-mono text-xs">
             <div className="text-signal">{placeName(shown)}</div>
             <div className="text-mute">
-              {shown.ips.length} IP{shown.ips.length === 1 ? "" : "s"} · {shown.sessions} session{shown.sessions === 1 ? "" : "s"} · {precisionLabel(shown.precision)}
+              {shown.count} IP{shown.count === 1 ? "" : "s"} · {shown.sessions} session{shown.sessions === 1 ? "" : "s"} · {precisionLabel(shown.precision)}
             </div>
-            {shown.ips.length > 1 && pinned === shown && (
+            {shown.count > 1 && pinned === shown && (
               <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
                 {shown.ips.slice(0, 20).map((ip) => (
                   <li key={ip}><Link className="text-signal hover:underline" to={`/attackers/${encodeURIComponent(ip)}`}>{ip}</Link></li>
                 ))}
-                {shown.ips.length > 20 && <li className="text-mute">+{shown.ips.length - 20} more</li>}
+                {shown.count > Math.min(20, shown.ips.length) && <li className="text-mute">+{shown.count - Math.min(20, shown.ips.length)} more</li>}
               </ul>
             )}
           </div>

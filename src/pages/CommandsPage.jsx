@@ -1,28 +1,39 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import PageHeader from "../components/PageHeader.jsx";
+import Pager from "../components/Pager.jsx";
 import Panel from "../components/Panel.jsx";
 import RefreshButton from "../components/RefreshButton.jsx";
-import SortTh, { nextSort, sortRows } from "../components/SortTh.jsx";
+import SortTh, { nextSort } from "../components/SortTh.jsx";
 import StatBlock from "../components/StatBlock.jsx";
 import { Empty, ErrorBox, Loading } from "../components/States.jsx";
 import { useAsync } from "../hooks/useAsync.js";
-import { clearCache, getCommandCorpus } from "../lib/api.js";
-import { groupCommands, summarizeGroups } from "../lib/commands.js";
+import { useDebounced } from "../hooks/useDebounced.js";
+import { clearCache, getCommandGroups, getStats } from "../lib/api.js";
 import { fmtDateTime, truncate } from "../lib/format.js";
+import { PAGE_LIMIT, pageCount } from "../lib/paging.js";
 
 export default function CommandsPage() {
-  const { data, error, loading, updatedAt, reload } = useAsync(async () => groupCommands(await getCommandCorpus()), []);
   const [q, setQ] = useState("");
   const [sort, setSort] = useState({ key: "count", dir: "desc" });
-  const rows = useMemo(() => {
-    const n = q.trim().toLowerCase();
-    const flat = (data || []).map((g) => ({ ...g, last_ts: g.last ? g.last.getTime() : null }));
-    return sortRows(flat.filter((g) => !n || g.text.toLowerCase().includes(n)), sort);
-  }, [data, q, sort]);
-  const sum = data ? summarizeGroups(data) : null;
+  const [page, setPage] = useState(0);
+  const dq = useDebounced(q.trim(), 300);
+
+  const { data, error, loading, updatedAt, reload } = useAsync(async () => {
+    const [list, stats] = await Promise.all([
+      getCommandGroups({ limit: PAGE_LIMIT, skip: page * PAGE_LIMIT, q: dq, sort: sort.key, order: sort.dir }),
+      getStats(),
+    ]);
+    return { ...list, stats };
+  }, [page, dq, sort.key, sort.dir]);
+
+  useEffect(() => {
+    if (data && data.rows.length === 0 && page > 0 && data.total !== null) setPage(pageCount(data.total, PAGE_LIMIT) - 1);
+  }, [data, page]);
+
   const refresh = () => { clearCache(); reload(); };
-  const onSort = (k) => setSort((s) => nextSort(s, k));
+  const onSort = (k) => { setSort((s) => nextSort(s, k)); setPage(0); };
+  const top = data && sort.key === "count" && sort.dir === "desc" && page === 0 && !dq ? data.rows[0] : null;
 
   return (
     <div>
@@ -34,37 +45,39 @@ export default function CommandsPage() {
       {data && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-5">
-            <StatBlock label="Commands loaded" value={sum.total} hint="most recent, up to 2000" />
-            <StatBlock label="Unique commands" value={sum.unique} />
-            <StatBlock label="Most common" text={sum.top ? `${sum.top.count}\u00d7` : "\u2014"} hint={sum.top ? truncate(sum.top.text, 40) : "none yet"} tone="threat" />
+            <StatBlock label="Commands recorded" value={data.stats.total_commands} hint="all of them" />
+            <StatBlock label={dq ? "Matching commands" : "Unique commands"} value={data.total ?? data.rows.length} />
+            <StatBlock label="Most common" text={top ? `${top.count}×` : "—"} hint={top ? truncate(top.text, 40) : "sort by Count to see"} tone="threat" />
           </div>
-          <Panel title="Command summary" right={<input className="input !w-56" placeholder="search commands" aria-label="Search commands" value={q} onChange={(e) => setQ(e.target.value)} />}>
-            {rows.length === 0 ? <Empty>{data.length === 0 ? "No commands recorded yet" : "No commands match"}</Empty> : (
+          <Panel title="Command summary" right={<input className="input !w-56" placeholder="search all commands" aria-label="Search commands" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} />}>
+            {error && <div className="mb-3"><ErrorBox error={error} /></div>}
+            {data.rows.length === 0 ? <Empty>{dq ? "No commands match" : "No commands recorded yet"}</Empty> : (
               <div className="overflow-x-auto">
                 <table className="tbl">
                   <thead>
                     <tr>
                       <SortTh label="Command" k="text" sort={sort} onSort={onSort} />
                       <SortTh label="Count" k="count" sort={sort} onSort={onSort} />
-                      <SortTh label="IPs" k="ipCount" sort={sort} onSort={onSort} />
-                      <SortTh label="Sessions" k="sessionCount" sort={sort} onSort={onSort} />
+                      <SortTh label="IPs" k="ip_count" sort={sort} onSort={onSort} />
+                      <SortTh label="Sessions" k="session_count" sort={sort} onSort={onSort} />
                       <SortTh label="Last seen" k="last_ts" sort={sort} onSort={onSort} />
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((g) => (
+                    {data.rows.map((g) => (
                       <tr key={g.key}>
                         <td className="data"><Link className="text-signal hover:underline" to={`/commands/${g.key}`}>{truncate(g.text, 120)}</Link></td>
                         <td className="font-mono">{g.count}</td>
-                        <td className="font-mono">{g.ipCount}</td>
-                        <td className="font-mono">{g.sessionCount}</td>
-                        <td className="font-mono text-xs">{fmtDateTime(g.last)}</td>
+                        <td className="font-mono">{g.ip_count}</td>
+                        <td className="font-mono">{g.session_count}</td>
+                        <td className="font-mono text-xs">{fmtDateTime(g.last_ts)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             )}
+            <Pager page={page} size={PAGE_LIMIT} shown={data.rows.length} total={data.total} onPage={setPage} disabled={loading} />
           </Panel>
         </>
       )}
