@@ -89,6 +89,7 @@ export function normalizeCommand(r) {
     src_ip: String(o.src_ip ?? ""),
     timestamp: o.timestamp ?? null,
     input: String(o.input ?? ""),
+    cmd_key: typeof o.cmd_key === "string" && /^[0-9a-f]{24}$/.test(o.cmd_key) ? o.cmd_key : null,
   };
 }
 
@@ -111,4 +112,51 @@ export function normalizeCredential(r) {
   const username = o.username ?? null;
   const password = o.password ?? null;
   return { username, password, count: num(o.count), label: `${username ?? ""}:${password ?? ""}` };
+}
+
+export function normalizeGroup(r) {
+  const o = r && typeof r === "object" ? r : {};
+  return {
+    key: String(o.key ?? ""),
+    text: String(o.text ?? ""),
+    count: num(o.count),
+    ip_count: num(o.ip_count),
+    session_count: num(o.session_count),
+    first_ts: o.first_ts ?? null,
+    last_ts: o.last_ts ?? null,
+  };
+}
+
+export function normalizeCountries(r) {
+  const o = r && typeof r === "object" ? r : {};
+  return {
+    countries: asList(o.countries).map((c) => ({
+      code: c && typeof c.code === "string" ? c.code : null,
+      name: String((c && (c.name || c.code)) ?? "Unknown"),
+      ips: num(c && c.ips),
+      sessions: num(c && c.sessions),
+    })),
+    located: num(o.located),
+    total: num(o.total),
+    pending: num(o.pending),
+  };
+}
+
+export function normalizePoints(r) {
+  const o = r && typeof r === "object" ? r : {};
+  const dots = asList(o.dots)
+    .map((d) => ({
+      key: String(d?.key ?? ""),
+      latitude: numOrNull(d?.latitude),
+      longitude: numOrNull(d?.longitude),
+      count: num(d?.count),
+      sessions: num(d?.sessions),
+      ips: asList(d?.ips).map(String),
+      country: d?.country ?? null,
+      region: d?.region ?? null,
+      city: d?.city ?? null,
+      precision: d?.precision ?? null,
+    }))
+    .filter((d) => d.latitude !== null && d.longitude !== null);
+  return { dots, located: num(o.located), unplaced: num(o.unplaced), total: num(o.total), pending: num(o.pending) };
 }

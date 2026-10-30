@@ -7,7 +7,7 @@ import RefreshButton from "../components/RefreshButton.jsx";
 import { Empty, ErrorBox, Loading } from "../components/States.jsx";
 import { useAsync } from "../hooks/useAsync.js";
 import { getIpSessions, getSession, getSessionCommands } from "../lib/api.js";
-import { fmtDateTime, fmtDuration, hashStr, toDate } from "../lib/format.js";
+import { fmtDateTime, fmtSessionDuration, toDate } from "../lib/format.js";
 
 function Row({ k, children }) {
   return (
@@ -48,7 +48,7 @@ export default function SessionDetailPage() {
           <Row k="Password">{s.password ?? "\u2014"}</Row>
           <Row k="Started">{fmtDateTime(s.start_time)}</Row>
           <Row k="Ended">{fmtDateTime(s.end_time)}</Row>
-          <Row k="Duration">{fmtDuration(s.duration_seconds)}</Row>
+          <Row k="Duration">{fmtSessionDuration(s)}</Row>
           <Row k="Status">{s.status}</Row>
           <Row k="Client">{s.client_version ?? "\u2014"}</Row>
           <Row k="Downloads">{s.download_count}</Row>
@@ -69,7 +69,7 @@ export default function SessionDetailPage() {
                     <td className="font-mono text-xs whitespace-nowrap">{fmtDateTime(c.timestamp)}</td>
                     <td className="font-mono">{off === null ? "\u2014" : `+${off}`}</td>
                     <td><ExpandableText text={c.input} /></td>
-                    <td className="whitespace-nowrap"><Link className="text-xs text-signal underline" to={`/commands/${hashStr(c.input.trim())}`}>details</Link></td>
+                    <td className="whitespace-nowrap">{c.cmd_key ? <Link className="text-xs text-signal underline" to={`/commands/${c.cmd_key}`}>details</Link> : null}</td>
                   </tr>
                 );
               })}

@@ -10,7 +10,7 @@ import StatBlock from "../components/StatBlock.jsx";
 import { Empty, ErrorBox, Loading } from "../components/States.jsx";
 import { useAsync } from "../hooks/useAsync.js";
 import { getAttacker, getGeoStatus, getIpCommands, getIpSessions } from "../lib/api.js";
-import { fmtDateTime, fmtDuration, hashStr, isValidIp } from "../lib/format.js";
+import { fmtDateTime, fmtSessionDuration, isValidIp } from "../lib/format.js";
 import { placeName, precisionLabel } from "../lib/geo.js";
 import { dailyFromSessions } from "../lib/series.js";
 
@@ -89,7 +89,7 @@ export default function IpDetailPage() {
                   <tr key={s.id}>
                     <td className="font-mono"><Link className="text-signal hover:underline" to={`/sessions/${encodeURIComponent(s.id)}`}>{s.id}</Link></td>
                     <td className="font-mono text-xs">{fmtDateTime(s.start_time)}</td>
-                    <td className="font-mono">{fmtDuration(s.duration_seconds)}</td>
+                    <td className="font-mono">{fmtSessionDuration(s)}</td>
                     <td><AccessPill ok={s.login_success} /></td>
                     <td className="font-mono">{s.command_count}</td>
                   </tr>
@@ -109,7 +109,7 @@ export default function IpDetailPage() {
                 <tr key={c.id}>
                   <td className="font-mono text-xs whitespace-nowrap">{fmtDateTime(c.timestamp)}</td>
                   <td><ExpandableText text={c.input} /></td>
-                  <td className="whitespace-nowrap"><Link className="text-xs text-signal underline" to={`/commands/${hashStr(c.input.trim())}`}>details</Link></td>
+                  <td className="whitespace-nowrap">{c.cmd_key ? <Link className="text-xs text-signal underline" to={`/commands/${c.cmd_key}`}>details</Link> : null}</td>
                 </tr>
               ))}
             </tbody>

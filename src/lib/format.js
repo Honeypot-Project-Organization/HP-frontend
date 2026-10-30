@@ -49,6 +49,13 @@ export function fmtDuration(sec) {
   if (m < 60) return `${m}m ${r}s`;
   return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
+/** Duration for a session row: the number, or why there is none. */
+export function fmtSessionDuration(s) {
+  if (!s) return "\u2014";
+  const n = numOrNull(s.duration_seconds);
+  if (n !== null) return fmtDuration(n);
+  return s.status === "closed" ? "\u2014" : "open";
+}
 export function plural(n, word) {
   return `${n} ${word}${n === 1 ? "" : "s"}`;
 }
