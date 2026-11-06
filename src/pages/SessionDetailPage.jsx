@@ -1,6 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import AccessPill from "../components/AccessPill.jsx";
 import ExpandableText from "../components/ExpandableText.jsx";
+import TechniqueList from "../components/TechniqueList.jsx";
 import PageHeader from "../components/PageHeader.jsx";
 import Panel from "../components/Panel.jsx";
 import RefreshButton from "../components/RefreshButton.jsx";
@@ -52,6 +53,7 @@ export default function SessionDetailPage() {
           <Row k="Status">{s.status}</Row>
           <Row k="Client">{s.client_version ?? "\u2014"}</Row>
           <Row k="Downloads">{s.download_count}</Row>
+          <Row k="MITRE techniques"><TechniqueList ids={s.techniques} empty="None matched" /></Row>
         </dl>
       </Panel>
 

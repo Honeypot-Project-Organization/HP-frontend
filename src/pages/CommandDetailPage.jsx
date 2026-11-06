@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import TechniqueList from "../components/TechniqueList.jsx";
 import PageHeader from "../components/PageHeader.jsx";
 import Pager from "../components/Pager.jsx";
 import Panel from "../components/Panel.jsx";
@@ -41,6 +42,9 @@ export default function CommandDetailPage() {
         <StatBlock label="Sessions" value={group.session_count} />
         <StatBlock label="Last seen" text={fmtDateTime(group.last_ts)} />
       </div>
+      <Panel title="Linked MITRE ATT&CK techniques" className="mb-5">
+        <TechniqueList ids={group.techniques} empty="No technique matched this command" />
+      </Panel>
       <Panel title="Occurrences">
         <div className="overflow-x-auto">
           <table className="tbl">

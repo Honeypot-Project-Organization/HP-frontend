@@ -3,6 +3,7 @@ import AccessPill from "../components/AccessPill.jsx";
 import ConnectionChart from "../components/ConnectionChart.jsx";
 import ExpandableText from "../components/ExpandableText.jsx";
 import MapPanel from "../components/MapPanel.jsx";
+import TechniqueList from "../components/TechniqueList.jsx";
 import PageHeader from "../components/PageHeader.jsx";
 import Panel from "../components/Panel.jsx";
 import RefreshButton from "../components/RefreshButton.jsx";
@@ -77,6 +78,10 @@ export default function IpDetailPage() {
               : "No location found for this IP"}
           </Empty>
         )}
+      </Panel>
+
+      <Panel title="Linked MITRE ATT&CK techniques" className="mt-5">
+        <TechniqueList ids={info.techniques} empty="No technique matched this IP" />
       </Panel>
 
       <Panel title={`Sessions (${sessions.length})`} className="mt-5">
