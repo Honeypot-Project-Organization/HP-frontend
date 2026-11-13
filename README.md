@@ -36,7 +36,11 @@ Set `VITE_API_BASE_URL` to your API URL, `npm run build`, then `firebase deploy 
 | `/attackers` | `/api/ips` |
 | `/attackers/:ip` | `/api/ips/{ip}`, `/api/ips/{ip}/sessions`, `/api/ips/{ip}/commands`, `/api/geo/status` + origin map/table + VirusTotal link (no API/key) |
 | `/sessions`, `/sessions/:id` | `/api/sessions`, `/api/sessions/{id}`, `/api/sessions/{id}/commands` |
-| `/commands`, `/commands/:key` | `/api/commands` (grouped client-side) |
+| `/commands`, `/commands/:key` | `/api/commands/groups` (+ `/{key}`, `/occurrences`) |
+| `/mitre` | `/api/mitre/summary` (totals, top event/command-based, all techniques with a type filter) |
+| `/mitre/:tid` | `/api/mitre/{id}`, `/daily`, `/commands`, `/ips`, `/sessions` (rule regexes, tactics, ATT&CK link, activity chart, three paged lists) |
+
+MITRE: the dashboard shows the top 10 techniques plus top 10 event-based and command-based lists; Attackers, Sessions and Commands have a technique filter (`technique=` sent to the server). Matches are heuristic and labelled as such. Deploy the backend first; if `/api/mitre/*` is missing the dashboard still loads and shows a notice. The sidebar links to virustotal.com and attack.mitre.org.
 
 **Backend routes added for this frontend** (in the backend repo, `app/routers/dashboard.py`):
 `GET /api/ips/{ip}`, `/api/ips/{ip}/sessions`, `/api/ips/{ip}/commands`, `/api/commands`, `/api/sessions/{id}`.

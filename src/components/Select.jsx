@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import Popover from "./Popover.jsx";
 
 /** Themed drop-down (the browser's native one cannot be styled). options: [{ value, label }] */
-export default function Select({ value, onChange, options, label, width = 160 }) {
+export default function Select({ value, onChange, options, label, width = 160, menuWidth }) {
   const [open, setOpen] = useState(false);
   const btn = useRef(null);
   const close = useCallback(() => setOpen(false), []);
@@ -16,7 +16,7 @@ export default function Select({ value, onChange, options, label, width = 160 })
         <span>{current ? current.label : ""}</span>
         <span aria-hidden="true" className="float-right text-signal">▾</span>
       </button>
-      <Popover anchorRef={btn} open={open} onClose={close} width={width} role="listbox" label={label}>
+      <Popover anchorRef={btn} open={open} onClose={close} width={menuWidth || width} role="listbox" label={label}>
         {options.map((o) => (
           <button
             key={o.value} type="button" role="option" aria-selected={o.value === value}

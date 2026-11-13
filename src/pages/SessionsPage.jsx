@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import AccessPill from "../components/AccessPill.jsx";
 import DateRange from "../components/DateRange.jsx";
 import Select from "../components/Select.jsx";
+import TechniqueFilter from "../components/TechniqueFilter.jsx";
 import PageHeader from "../components/PageHeader.jsx";
 import Pager from "../components/Pager.jsx";
 import Panel from "../components/Panel.jsx";
@@ -22,6 +23,7 @@ export default function SessionsPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [sort, setSort] = useState({ key: "start_time", dir: "desc" });
+  const [technique, setTechnique] = useState("");
   const [page, setPage] = useState(0);
   const dq = useDebounced(q.trim(), 300);
   const bad = rangeProblem(from, to);
@@ -31,9 +33,9 @@ export default function SessionsPage() {
   const { data, error, loading, updatedAt, reload } = useAsync(
     () => getSessionsList({
       limit: PAGE_LIMIT, skip: page * PAGE_LIMIT, q: dq, login: login === "all" ? "" : login,
-      date_from: dateFrom, date_to: dateTo, sort: sort.key, order: sort.dir,
+      date_from: dateFrom, date_to: dateTo, technique, sort: sort.key, order: sort.dir,
     }),
-    [page, dq, login, dateFrom, dateTo, sort.key, sort.dir],
+    [page, dq, login, dateFrom, dateTo, technique, sort.key, sort.dir],
   );
 
   useEffect(() => {
@@ -43,7 +45,7 @@ export default function SessionsPage() {
   const filtered = (v) => (set) => { set(v); setPage(0); };
   const refresh = () => { clearCache(); reload(); };
   const onSort = (k) => { setSort((s) => nextSort(s, k)); setPage(0); };
-  const anyFilter = Boolean(dq || login !== "all" || dateFrom || dateTo);
+  const anyFilter = Boolean(dq || login !== "all" || dateFrom || dateTo || technique);
 
   return (
     <div>
@@ -58,6 +60,7 @@ export default function SessionsPage() {
           right={
             <div className="flex gap-2">
               <input className="input !w-44" placeholder="filter by IP (all sessions)" aria-label="Filter by IP" value={q} onChange={(e) => filtered(e.target.value)(setQ)} />
+              <TechniqueFilter value={technique} onChange={(v) => filtered(v)(setTechnique)} />
               <Select
                 label="Filter by result" value={login} width={128} onChange={(v) => filtered(v)(setLogin)}
                 options={[{ value: "all", label: "all" }, { value: "granted", label: "granted" }, { value: "denied", label: "denied" }]}

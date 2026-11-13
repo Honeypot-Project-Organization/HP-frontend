@@ -88,3 +88,7 @@ normally do).
   pipeline stops delivering.
 - `/api/stats/top-credentials` returns `username` and `password` as separate
   fields.
+- MITRE data: technique ids come from the API and are checked against `^T\d{4}(\.\d{3})?$` before use. The
+  attack.mitre.org link is built in the browser from the validated id (the API's `url` is ignored). Rule patterns
+  are regular expressions shown as plain text. They are never executed.
+- External links (VirusTotal, attack.mitre.org) open in a new tab with `rel="noopener noreferrer"`.

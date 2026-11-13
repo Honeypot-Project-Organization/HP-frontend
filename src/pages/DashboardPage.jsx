@@ -2,16 +2,18 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import AccessPill from "../components/AccessPill.jsx";
 import ConnectionChart from "../components/ConnectionChart.jsx";
+import MatchNote from "../components/MatchNote.jsx";
 import MapPanel from "../components/MapPanel.jsx";
 import PageHeader from "../components/PageHeader.jsx";
 import Panel from "../components/Panel.jsx";
 import RefreshButton from "../components/RefreshButton.jsx";
+import TechniqueTable from "../components/TechniqueTable.jsx";
 import StatBlock from "../components/StatBlock.jsx";
 import { Empty, ErrorBox, Loading } from "../components/States.jsx";
 import { useAsync } from "../hooks/useAsync.js";
 import {
   getAttackersList, getDailySeries, getGeoPoints, getGeoStatus, getSessionsPage, getStats, getTopCountries,
-  getTopCredentials, clearCache,
+  getMitreSummary, getTopCredentials, clearCache,
 } from "../lib/api.js";
 import { fmtRelative, fmtDateTime, fmtSessionDuration, toDate } from "../lib/format.js";
 import { fillDays } from "../lib/series.js";
@@ -22,12 +24,14 @@ export default function DashboardPage() {
   const [days, setDays] = useState(30);
   const { data, error, loading, updatedAt, reload } = useAsync(async () => {
     // Top lists are computed by the server over ALL rows, not over a loaded subset.
-    const [stats, daily, sessions, top, creds, geoStatus, countries, points] = await Promise.all([
+    const [stats, daily, sessions, top, creds, geoStatus, countries, points, mitre] = await Promise.all([
       getStats(), getDailySeries(days), getSessionsPage(0, 10),
       getAttackersList({ limit: 10, sort: "total_sessions", order: "desc" }).then((r) => r.rows),
       getTopCredentials(10), getGeoStatus(), getTopCountries(10), getGeoPoints(),
+      // An API without MITRE support must not break the dashboard (401 still logs out).
+      getMitreSummary().catch((e) => { if (e && e.status === 401) throw e; return null; }),
     ]);
-    return { stats, daily: fillDays(daily, days), sessions, top, creds, geoStatus, countries, points };
+    return { stats, daily: fillDays(daily, days), sessions, top, creds, geoStatus, countries, points, mitre };
   }, [days], 60000);
 
   const refresh = () => { clearCache(); reload(); };
@@ -39,7 +43,8 @@ export default function DashboardPage() {
   if (!data && loading) return <div>{header}<Loading label="Fetching telemetry" /></div>;
   if (!data) return <div>{header}<ErrorBox error={error} onRetry={refresh} /></div>;
 
-  const { stats, daily, sessions, top, creds, geoStatus, points } = data;
+  const { stats, daily, sessions, top, creds, geoStatus, points, mitre } = data;
+  const tech = mitre ? mitre.techniques : [];
   const countries = data.countries.countries;
   const last = toDate(stats.last_event_received_at);
   const stale = last ? Date.now() - last.getTime() > 3600_000 : false;
@@ -135,6 +140,26 @@ export default function DashboardPage() {
           )}
         </Panel>
       </div>
+
+      <Panel title="Top MITRE ATT&CK techniques" className="mt-5" right={<Link className="text-xs text-signal underline" to="/mitre">all</Link>}>
+        {!mitre ? <Empty>MITRE data is not available from this API</Empty> : (
+          <>
+            <TechniqueTable rows={tech.slice(0, 10)} empty="No techniques matched yet" />
+            <MatchNote className="mt-3" />
+          </>
+        )}
+      </Panel>
+
+      {mitre && (
+        <div className="grid gap-5 lg:grid-cols-2 mt-5">
+          <Panel title="Top event-based techniques">
+            <TechniqueTable rows={tech.filter((r) => r.basis === "event").slice(0, 10)} empty="No event-based techniques yet" />
+          </Panel>
+          <Panel title="Top command-based techniques">
+            <TechniqueTable rows={tech.filter((r) => r.basis === "command").slice(0, 10)} empty="No command-based techniques yet" />
+          </Panel>
+        </div>
+      )}
 
       <Panel title="Top credentials tried" className="mt-5">
         {creds.length === 0 ? <Empty>No credential attempts yet</Empty> : (

@@ -1,11 +1,12 @@
 import {
-  ApiError, asList, normalizeAttacker, normalizeCommand, normalizeCountries, normalizeCredential,
+  ApiError, asList, normalizeAttacker, normalizeCatalogEntry, normalizeMitreSummary, normalizeTechDaily, normalizeTechnique, normalizeCommand, normalizeCountries, normalizeCredential,
   normalizeDaily, normalizeGroup, normalizePoints, normalizeSession, normalizeStats,
 } from "./normalize.js";
 
 const rawBase = import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000";
 export const apiBase = String(rawBase).replace(/\/+$/, "");
 
+let catalogPromise = null; // the technique catalog never changes during a session
 const TOKEN_KEY = "honeypot_token";
 let memToken = null; // fallback when sessionStorage is unavailable
 export const UNAUTHORIZED_EVENT = "honeypot:unauthorized";
@@ -25,6 +26,7 @@ export function clearToken() {
   memToken = null;
   try { sessionStorage.removeItem(TOKEN_KEY); } catch { /* storage blocked */ }
   cache.clear();
+  catalogPromise = null;
 }
 
 const cache = new Map();
@@ -158,3 +160,22 @@ export const getCommandGroup = (key) =>
 export const getCommandOccurrences = (key, params) =>
   request(`/api/commands/groups/${encodeURIComponent(key)}/occurrences${qs(params)}`, { meta: true })
     .then(({ data, total }) => ({ rows: asList(data).map(normalizeCommand), total }));
+
+// ---- MITRE ATT&CK (matches are heuristic; see the API's app/mitre.py)
+export function getMitreCatalog() {
+  if (!catalogPromise) {
+    catalogPromise = request("/api/mitre/catalog").then((r) => asList(r).map(normalizeCatalogEntry));
+    catalogPromise.catch(() => { catalogPromise = null; });
+  }
+  return catalogPromise;
+}
+export const getMitreSummary = () => request("/api/mitre/summary").then(normalizeMitreSummary);
+export const getMitreTechnique = (id) => request(`/api/mitre/${encodeURIComponent(id)}`).then(normalizeTechnique);
+export const getMitreDaily = (id, days = 30) =>
+  request(`/api/mitre/${encodeURIComponent(id)}/daily?days=${encodeURIComponent(days)}`).then(normalizeTechDaily);
+/** kind: "commands" | "ips" | "sessions" -> { rows, total } */
+export function getMitreLinked(id, kind, params) {
+  const path = `/api/mitre/${encodeURIComponent(id)}/${kind}${qs(params)}`;
+  const norm = { commands: normalizeCommand, ips: normalizeAttacker, sessions: normalizeSession }[kind];
+  return request(path, { meta: true }).then(({ data, total }) => ({ rows: asList(data).map(norm), total }));
+}

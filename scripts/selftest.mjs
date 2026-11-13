@@ -9,6 +9,8 @@ import { normalizeCommand, normalizeCountries, normalizeGroup, normalizePoints }
 import { pageCount, pageWindow, rangeLabel } from "../src/lib/paging.js";
 import { parseUtcInput, rangeProblem } from "../src/lib/dates.js";
 import { qs } from "../src/lib/api.js";
+import { attackUrl, isTechId, techList } from "../src/lib/mitre.js";
+import { normalizeMitreSummary, normalizeTechDaily, normalizeTechnique } from "../src/lib/normalize.js";
 import { clamp, daysInMonth, formatParts, monthGrid, parseParts, shiftMonth } from "../src/lib/calendar.js";
 
 let n = 0;
@@ -105,6 +107,24 @@ t("calendar helpers", () => {
   assert.deepEqual(shiftMonth(2026, 11, 1), { y: 2027, mo: 0 });
   assert.equal(clamp(99, 0, 59), 59);
   assert.equal(clamp(NaN, 0, 59), 0);
+});
+t("MITRE helpers and normalizers", () => {
+  assert.ok(isTechId("T1082") && isTechId("T1110.001") && !isTechId("t1082") && !isTechId("T1082.1") && !isTechId("<script>"));
+  assert.equal(attackUrl("T1110.001"), "https://attack.mitre.org/techniques/T1110/001/");
+  assert.equal(attackUrl("T1082"), "https://attack.mitre.org/techniques/T1082/");
+  assert.equal(attackUrl("javascript:alert(1)"), null);
+  assert.deepEqual(techList(["T1105", "bad", "T1082", "T1105", 5]), ["T1082", "T1105"]);
+  assert.deepEqual(techList(null), []);
+  const s = normalizeMitreSummary({ total_ids: "9", unique_ids: 2, top: { id: "T1082", occurrences: 5, ips: 2, basis: "command" },
+    top_event: { id: "<x>", occurrences: 1 }, techniques: [{ id: "T1082", occurrences: 5 }, { id: "evil" }] });
+  assert.equal(s.total_ids, 9);
+  assert.equal(s.top.id, "T1082");
+  assert.equal(s.top_event, null);      // not a technique id: dropped
+  assert.equal(s.techniques.length, 1);
+  const t = normalizeTechnique({ id: "T1110.001", basis: "event", rules: [{ name: "cowrie.login.failed", pattern: null, scope: "event", description: "d" }], occurrences: 3 });
+  assert.equal(t.rules[0].pattern, null);
+  assert.equal(t.sessions, 0);
+  assert.deepEqual(normalizeTechDaily([{ date: "2026-09-01", count: 4 }, { nope: 1 }]), [{ date: "2026-09-01", connections: 4, granted: 0 }]);
 });
 t("query strings skip empty values and encode the rest", () => {
   assert.equal(qs({ a: 1, b: "", c: null, d: undefined, e: " x y " }), "?a=1&e=x+y");

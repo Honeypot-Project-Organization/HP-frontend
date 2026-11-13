@@ -1,12 +1,12 @@
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Empty } from "./States.jsx";
 
-export default function ConnectionChart({ data, showGranted = false, height = 260 }) {
+export default function ConnectionChart({ data, showGranted = false, height = 260, label = "Connections", emptyText = "No connections in this range" }) {
   if (!data || data.length === 0 || data.every((d) => d.connections === 0)) {
-    return <Empty>No connections in this range</Empty>;
+    return <Empty>{emptyText}</Empty>;
   }
   return (
-    <div style={{ width: "100%", height }} role="img" aria-label="Connection history chart">
+    <div style={{ width: "100%", height }} role="img" aria-label={`${label} chart`}>
       <ResponsiveContainer>
         <AreaChart data={data} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
           <defs>
@@ -22,7 +22,7 @@ export default function ConnectionChart({ data, showGranted = false, height = 26
             contentStyle={{ background: "#07110B", border: "1px solid #00FF88", borderRadius: 0, fontFamily: "monospace" }}
             labelStyle={{ color: "#00FF88" }}
           />
-          <Area type="monotone" dataKey="connections" name="Connections" stroke="#00FF88" strokeWidth={2} fill="url(#gConn)" />
+          <Area type="monotone" dataKey="connections" name={label} stroke="#00FF88" strokeWidth={2} fill="url(#gConn)" />
           {showGranted && <Area type="monotone" dataKey="granted" name="Logins granted" stroke="#FF4D4D" strokeWidth={2} fill="none" />}
         </AreaChart>
       </ResponsiveContainer>

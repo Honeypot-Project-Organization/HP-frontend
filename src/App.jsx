@@ -7,6 +7,8 @@ import CommandsPage from "./pages/CommandsPage.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
 import IpDetailPage from "./pages/IpDetailPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
+import MitreDetailPage from "./pages/MitreDetailPage.jsx";
+import MitrePage from "./pages/MitrePage.jsx";
 import NotFoundPage from "./pages/NotFoundPage.jsx";
 import SessionDetailPage from "./pages/SessionDetailPage.jsx";
 import SessionsPage from "./pages/SessionsPage.jsx";
@@ -23,6 +25,8 @@ export default function App() {
         <Route path="sessions/:sessionId" element={<SessionDetailPage />} />
         <Route path="commands" element={<CommandsPage />} />
         <Route path="commands/:key" element={<CommandDetailPage />} />
+        <Route path="mitre" element={<MitrePage />} />
+        <Route path="mitre/:tid" element={<MitreDetailPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

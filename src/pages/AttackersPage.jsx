@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import DateRange from "../components/DateRange.jsx";
 import Select from "../components/Select.jsx";
+import TechniqueFilter from "../components/TechniqueFilter.jsx";
 import PageHeader from "../components/PageHeader.jsx";
 import Pager from "../components/Pager.jsx";
 import Panel from "../components/Panel.jsx";
@@ -21,6 +22,7 @@ export default function AttackersPage() {
   const [to, setTo] = useState("");
   const [dateField, setDateField] = useState("last_seen");
   const [sort, setSort] = useState({ key: "last_seen", dir: "desc" });
+  const [technique, setTechnique] = useState("");
   const [page, setPage] = useState(0);
   const dq = useDebounced(q.trim(), 300);
   const bad = rangeProblem(from, to);
@@ -30,9 +32,9 @@ export default function AttackersPage() {
   const { data, error, loading, updatedAt, reload } = useAsync(
     () => getAttackersList({
       limit: PAGE_LIMIT, skip: page * PAGE_LIMIT, q: dq, date_from: dateFrom, date_to: dateTo,
-      date_field: dateField, sort: sort.key, order: sort.dir,
+      date_field: dateField, technique, sort: sort.key, order: sort.dir,
     }),
-    [page, dq, dateFrom, dateTo, dateField, sort.key, sort.dir],
+    [page, dq, dateFrom, dateTo, dateField, technique, sort.key, sort.dir],
   );
 
   // If the list shrank while viewing a late page, step back to the last real page.
@@ -43,7 +45,7 @@ export default function AttackersPage() {
   const filtered = (v) => (set) => { set(v); setPage(0); };
   const refresh = () => { clearCache(); reload(); };
   const onSort = (k) => { setSort((s) => nextSort(s, k)); setPage(0); };
-  const anyFilter = Boolean(dq || dateFrom || dateTo);
+  const anyFilter = Boolean(dq || dateFrom || dateTo || technique);
 
   return (
     <div>
@@ -55,7 +57,12 @@ export default function AttackersPage() {
       {data && (
         <Panel
           title={data.total === null ? "IPs" : `${data.total.toLocaleString("en-US")} ${anyFilter ? "matching " : ""}IPs`}
-          right={<input className="input !w-48" placeholder="filter by IP (all IPs)" aria-label="Filter by IP" value={q} onChange={(e) => filtered(e.target.value)(setQ)} />}
+          right={
+            <div className="flex gap-2">
+              <input className="input !w-44" placeholder="filter by IP (all IPs)" aria-label="Filter by IP" value={q} onChange={(e) => filtered(e.target.value)(setQ)} />
+              <TechniqueFilter value={technique} onChange={(v) => filtered(v)(setTechnique)} />
+            </div>
+          }
         >
           <DateRange
             from={from} to={to}

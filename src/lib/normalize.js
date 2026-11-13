@@ -1,4 +1,5 @@
 import { num, numOrNull } from "./format.js";
+import { isTechId, techList } from "./mitre.js";
 
 function str(v, max = 120) {
   return typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null;
@@ -78,6 +79,7 @@ export function normalizeSession(r) {
     download_count: num(o.download_count),
     client_version: o.client_version ?? null,
     status: o.status ?? "open",
+    techniques: techList(o.techniques),
   };
 }
 
@@ -90,6 +92,7 @@ export function normalizeCommand(r) {
     timestamp: o.timestamp ?? null,
     input: String(o.input ?? ""),
     cmd_key: typeof o.cmd_key === "string" && /^[0-9a-f]{24}$/.test(o.cmd_key) ? o.cmd_key : null,
+    techniques: techList(o.techniques),
   };
 }
 
@@ -104,6 +107,7 @@ export function normalizeAttacker(r) {
     total_auth_attempts: num(o.total_auth_attempts),
     successful_logins: num(o.successful_logins),
     geo: normalizeGeo(o.geo),
+    techniques: techList(o.techniques),
   };
 }
 
@@ -124,6 +128,7 @@ export function normalizeGroup(r) {
     session_count: num(o.session_count),
     first_ts: o.first_ts ?? null,
     last_ts: o.last_ts ?? null,
+    techniques: techList(o.techniques),
   };
 }
 
@@ -159,4 +164,59 @@ export function normalizePoints(r) {
     }))
     .filter((d) => d.latitude !== null && d.longitude !== null);
   return { dots, located: num(o.located), unplaced: num(o.unplaced), total: num(o.total), pending: num(o.pending) };
+}
+
+const BASIS = new Set(["event", "command"]);
+const strList = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === "string") : []);
+
+export function normalizeCatalogEntry(r) {
+  const o = r && typeof r === "object" ? r : {};
+  return { id: String(o.id ?? ""), name: o.name ?? null, tactics: strList(o.tactics), basis: BASIS.has(o.basis) ? o.basis : "command" };
+}
+
+export function normalizeTechRow(r) {
+  const o = r && typeof r === "object" ? r : {};
+  return {
+    id: String(o.id ?? ""),
+    name: o.name ?? null,
+    tactics: strList(o.tactics),
+    basis: BASIS.has(o.basis) ? o.basis : "command",
+    occurrences: num(o.occurrences),
+    ips: num(o.ips),
+    last_seen: o.last_seen ?? null,
+  };
+}
+
+export function normalizeMitreSummary(r) {
+  const o = r && typeof r === "object" ? r : {};
+  const row = (x) => (x && isTechId(x.id) ? normalizeTechRow(x) : null);
+  return {
+    total_ids: num(o.total_ids),
+    unique_ids: num(o.unique_ids),
+    top: row(o.top),
+    top_event: row(o.top_event),
+    top_command: row(o.top_command),
+    techniques: asList(o.techniques).filter((x) => x && isTechId(x.id)).map(normalizeTechRow),
+  };
+}
+
+export function normalizeTechnique(r) {
+  const o = r && typeof r === "object" ? r : {};
+  return {
+    ...normalizeTechRow(o),
+    known: Boolean(o.known),
+    rules: asList(o.rules).map((x) => ({
+      name: String(x?.name ?? ""), pattern: typeof x?.pattern === "string" ? x.pattern : null,
+      scope: String(x?.scope ?? ""), description: typeof x?.description === "string" ? x.description : null,
+    })),
+    sessions: num(o.sessions),
+    commands: num(o.commands),
+    first_seen: o.first_seen ?? null,
+  };
+}
+
+export function normalizeTechDaily(rows) {
+  return asList(rows)
+    .filter((r) => r && typeof r.date === "string")
+    .map((r) => ({ date: r.date.slice(0, 10), connections: num(r.count), granted: 0 }));
 }

@@ -28,7 +28,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen grid place-items-center p-4">
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-4">
+      <p className="font-mono text-sm uppercase tracking-wider text-signal text-center">Student Project - Authorized Users Only</p>
       <form onSubmit={submit} className="panel w-full max-w-sm p-6" aria-label="Login">
         <div className="font-mono text-xs text-mute">operator@honeypot:~$ ssh admin<span className="cursor ml-1" aria-hidden="true" /></div>
         <h1 className="mt-2 mb-5 text-2xl font-bold text-signal glow-signal tracking-wide">ACCESS CONSOLE</h1>

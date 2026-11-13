@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import TechniqueFilter from "../components/TechniqueFilter.jsx";
 import PageHeader from "../components/PageHeader.jsx";
 import Pager from "../components/Pager.jsx";
 import Panel from "../components/Panel.jsx";
@@ -16,16 +17,17 @@ import { PAGE_LIMIT, pageCount } from "../lib/paging.js";
 export default function CommandsPage() {
   const [q, setQ] = useState("");
   const [sort, setSort] = useState({ key: "count", dir: "desc" });
+  const [technique, setTechnique] = useState("");
   const [page, setPage] = useState(0);
   const dq = useDebounced(q.trim(), 300);
 
   const { data, error, loading, updatedAt, reload } = useAsync(async () => {
     const [list, stats] = await Promise.all([
-      getCommandGroups({ limit: PAGE_LIMIT, skip: page * PAGE_LIMIT, q: dq, sort: sort.key, order: sort.dir }),
+      getCommandGroups({ limit: PAGE_LIMIT, skip: page * PAGE_LIMIT, q: dq, technique, sort: sort.key, order: sort.dir }),
       getStats(),
     ]);
     return { ...list, stats };
-  }, [page, dq, sort.key, sort.dir]);
+  }, [page, dq, technique, sort.key, sort.dir]);
 
   useEffect(() => {
     if (data && data.rows.length === 0 && page > 0 && data.total !== null) setPage(pageCount(data.total, PAGE_LIMIT) - 1);
@@ -33,7 +35,7 @@ export default function CommandsPage() {
 
   const refresh = () => { clearCache(); reload(); };
   const onSort = (k) => { setSort((s) => nextSort(s, k)); setPage(0); };
-  const top = data && sort.key === "count" && sort.dir === "desc" && page === 0 && !dq ? data.rows[0] : null;
+  const top = data && sort.key === "count" && sort.dir === "desc" && page === 0 && !dq && !technique ? data.rows[0] : null;
 
   return (
     <div>
@@ -46,12 +48,17 @@ export default function CommandsPage() {
         <>
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-5">
             <StatBlock label="Commands recorded" value={data.stats.total_commands} hint="all of them" />
-            <StatBlock label={dq ? "Matching commands" : "Unique commands"} value={data.total ?? data.rows.length} />
+            <StatBlock label={dq || technique ? "Matching commands" : "Unique commands"} value={data.total ?? data.rows.length} />
             <StatBlock label="Most common" text={top ? `${top.count}×` : "—"} hint={top ? truncate(top.text, 40) : "sort by Count to see"} tone="threat" />
           </div>
-          <Panel title="Command summary" right={<input className="input !w-56" placeholder="search all commands" aria-label="Search commands" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} />}>
+          <Panel title="Command summary" right={
+            <div className="flex gap-2">
+              <input className="input !w-56" placeholder="search all commands" aria-label="Search commands" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} />
+              <TechniqueFilter value={technique} onChange={(v) => { setTechnique(v); setPage(0); }} />
+            </div>
+          }>
             {error && <div className="mb-3"><ErrorBox error={error} /></div>}
-            {data.rows.length === 0 ? <Empty>{dq ? "No commands match" : "No commands recorded yet"}</Empty> : (
+            {data.rows.length === 0 ? <Empty>{dq || technique ? "No commands match" : "No commands recorded yet"}</Empty> : (
               <div className="overflow-x-auto">
                 <table className="tbl">
                   <thead>
@@ -61,6 +68,7 @@ export default function CommandsPage() {
                       <SortTh label="IPs" k="ip_count" sort={sort} onSort={onSort} />
                       <SortTh label="Sessions" k="session_count" sort={sort} onSort={onSort} />
                       <SortTh label="Last seen" k="last_ts" sort={sort} onSort={onSort} />
+                      <th>MITRE</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -71,6 +79,11 @@ export default function CommandsPage() {
                         <td className="font-mono">{g.ip_count}</td>
                         <td className="font-mono">{g.session_count}</td>
                         <td className="font-mono text-xs">{fmtDateTime(g.last_ts)}</td>
+                        <td className="font-mono text-xs">
+                          {g.techniques.length === 0 ? "\u2014" : g.techniques.map((id, i) => (
+                            <span key={id}>{i > 0 ? ", " : ""}<Link className="text-signal hover:underline" to={`/mitre/${id}`}>{id}</Link></span>
+                          ))}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
